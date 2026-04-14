@@ -297,3 +297,6 @@ A few sentences about what you learned:
 - How did building this change how you think about real music recommenders
 - Where do you think human judgment still matters, even if the model seems "smart"
 
+### Screenshots
+![lofi profile output](images/screen1.png)
+![happy/pop profile output](images/screen2.png)
