@@ -1,111 +1,120 @@
-# 🎧 Model Card: Music Recommender Simulation
+# Model Card: Music Recommender Simulation
 
-## 1. Model Name  
+## 1. Model Name
 
-Give your model a short, descriptive name.  
-Example: **VibeFinder 1.0**  
+**MusicVibes 1.0**
 
----
-
-## 2. Intended Use  
-
-Describe what your recommender is designed to do and who it is for. 
-
-Prompts:  
-
-- What kind of recommendations does it generate  
-- What assumptions does it make about the user  
-- Is this for real users or classroom exploration  
+A lightweight song recommender that matches your vibe to a small catalog using mood, genre, and energy.
 
 ---
 
-## 3. How the Model Works  
+## 2. Intended Use
 
-Explain your scoring approach in simple language.  
+MusicVibes 1.0 is designed to suggest songs from a 15-track catalog based on what a user says they're in the mood for. You give it a genre, a mood, and how high-energy and positive you want the music to feel, and it ranks every song and returns the top five.
 
-Prompts:  
-
-- What features of each song are used (genre, energy, mood, etc.)  
-- What user preferences are considered  
-- How does the model turn those into a score  
-- What changes did you make from the starter logic  
-
-Avoid code here. Pretend you are explaining the idea to a friend who does not program.
+It is built for classroom exploration — not for real users or production. The catalog is too small, the matching is too simple, and it makes no attempt to learn from listening history. It should not be used to make decisions about what music gets promoted or surfaced to real people.
 
 ---
 
-## 4. Data  
+## 3. How the Model Works
 
-Describe the dataset the model uses.  
+Every song in the catalog gets a score from 0 to 14 based on how closely it matches the user's preferences. There are four things being compared:
 
-Prompts:  
+- **Mood** — if the song's mood matches yours exactly, it gets 4 points. If not, zero.
+- **Genre** — same idea, worth 2 points for an exact match.
+- **Energy** — the closer the song's energy level is to yours, the more points it earns. Very close gets 6 points, somewhat close gets 4 or 2, and far away gets nothing.
+- **Valence** (positivity) — same tiered approach, worth up to 2 points.
 
-- How many songs are in the catalog  
-- What genres or moods are represented  
-- Did you add or remove data  
-- Are there parts of musical taste missing in the dataset  
-
----
-
-## 5. Strengths  
-
-Where does your system seem to work well  
-
-Prompts:  
-
-- User types for which it gives reasonable results  
-- Any patterns you think your scoring captures correctly  
-- Cases where the recommendations matched your intuition  
+Once every song has a score, they get sorted from highest to lowest and the top five are returned. That's the whole thing — no learning, no history, just a point system applied to a list.
 
 ---
 
-## 6. Limitations and Bias 
+## 4. Data
 
-Where the system struggles or behaves unfairly. 
+The catalog has 15 songs across 12 genres and 11 distinct moods. Each song has an energy level and a valence score between 0 and 1. The data was written manually for this project — it does not come from a real streaming service.
 
-Prompts:  
-
-- Features it does not consider  
-- Genres or moods that are underrepresented  
-- Cases where the system overfits to one preference  
-- Ways the scoring might unintentionally favor some users  
+The catalog skews toward certain tastes: three songs are lofi, two are pop, and the "chill" mood appears three times. Most other genres and moods appear only once. There are almost no mid-energy songs — the catalog clusters around either very calm (energy 0.15–0.42) or very high-energy (0.75–0.96), with only one song in between. Dark or negative-sounding tracks are also rare — only one song has a genuinely low valence score.
 
 ---
 
-## 7. Evaluation  
+## 5. Strengths
 
-How you checked whether the recommender behaved as expected. 
+The system works best when the user's taste matches a well-represented part of the catalog. Lofi/chill and high-energy pop both produced clean, intuitive top-5 results where each song made sense in the ranking.
 
-Prompts:  
-
-- Which user profiles you tested  
-- What you looked for in the recommendations  
-- What surprised you  
-- Any simple tests or comparisons you ran  
-
-No need for numeric metrics unless you created some.
+It is also fully transparent — every recommendation comes with an explanation of exactly why each song scored what it did. You can see whether a song made it because of a mood match, energy proximity, or both. That kind of explainability is something real recommenders often hide.
 
 ---
 
-## 8. Future Work  
+## 6. Limitations and Bias
 
-Ideas for how you would improve the model next.  
-
-Prompts:  
-
-- Additional features or preferences  
-- Better ways to explain recommendations  
-- Improving diversity among the top results  
-- Handling more complex user tastes  
+One of the clearest weaknesses discovered during testing is what we called the "niche mood cliff" — users whose preferred mood appears only once in the catalog receive one strong recommendation and then an immediate collapse in quality. For example, a user who prefers a romantic, melancholic, or peaceful mood gets a perfect-scoring top result, but their second through fifth recommendations score less than half the maximum, chosen almost entirely by energy proximity rather than any real taste match. This stands in sharp contrast to a chill or intense user, whose mood appears two or three times in the catalog and produces a smooth, meaningful ranking across all five results. The root cause is that the scoring system has no way to signal catalog sparsity — it always returns five results even when only one genuinely fits, making the recommendations look confident when they are mostly noise. In a real product this would create a frustrating and potentially unfair experience where minority taste profiles receive the appearance of personalization without any of its actual value.
 
 ---
 
-## 9. Personal Reflection  
+## 7. Evaluation
 
-A few sentences about your experience.  
+**Profiles tested**
 
-Prompts:  
+Six user profiles were run through the system — three standard and three adversarial.
 
-- What you learned about recommender systems  
-- Something unexpected or interesting you discovered  
-- How this changed the way you think about music recommendation apps  
+Standard profiles:
+- **Chill Lofi** — lofi / chill / energy 0.38 / valence 0.58
+- **High-Energy Pop** — pop / intense / energy 0.90 / valence 0.75
+- **Deep Intense Rock** — rock / intense / energy 0.92 / valence 0.42
+
+Adversarial profiles (designed to expose weaknesses):
+- **Impossible Combo** — lofi / angry / energy 0.95 / valence 0.15
+- **Ghost Genre** — country / chill / energy 0.35 / valence 0.65 (country is not in the catalog)
+- **Dead Center** — zydeco / ethereal / energy 0.50 / valence 0.50 (neither label exists in the catalog)
+
+---
+
+**Chill Lofi vs High-Energy Pop**
+
+Both profiles produced a strong, expected #1 result. Chill Lofi's top five stayed stylistically coherent all the way down — each song made some kind of sense. High-Energy Pop's list held up through #3 (Gym Hero, Sunrise City, Storm Runner) but the logic behind #3 was revealing: Storm Runner scored high because it matched the "intense" mood, even though it's a rock song and the user asked for pop. The mood weight carried it above songs that were closer in genre. That makes sense mathematically, but it's the kind of result a real user might find surprising.
+
+---
+
+**Deep Intense Rock vs Impossible Combo**
+
+These two profiles are the most instructive pair. Deep Intense Rock worked exactly as intended — Storm Runner was a perfect 14/14 match and the ranking below it was clean. Impossible Combo was deliberately broken: the user asked for lofi (calm genre) but angry mood and very high energy. The result was that Iron Abyss, a metal track, landed at #1. The mood label "angry" (+4 points) completely overrode the lofi genre preference (+2 points). This confirmed that mood carries more weight than genre in the current system, and that conflicting preferences don't get averaged out — they get won by whichever feature has the higher point value.
+
+---
+
+**Ghost Genre vs Dead Center**
+
+Ghost Genre (country, not in catalog) still produced reasonable results because the mood "chill" was well-represented and energy was close enough on several tracks. The system quietly dropped the genre preference and fell back on what it could match. Dead Center (both labels missing) was the most extreme case — with no categorical matches at all, the entire top five was decided by which songs happened to sit closest to 0.50 energy and 0.50 valence. The scores were so flat (8, 8, 6, 6, 5 out of 14) that the ranking was barely meaningful. The system had no way to say "I don't have enough information" — it just returned five songs anyway.
+
+---
+
+**What we looked for**
+
+For each profile, we checked whether the top result made intuitive sense, whether the score gap between #1 and #5 reflected real differences in fit, and whether the reason strings matched the math. All scores were verified manually before running.
+
+---
+
+**What surprised us**
+
+The most surprising result was how confident the output looked even when it was essentially guessing. Dead Center returned five songs with clean formatting and scores, but none of those results actually reflected the user's taste — there was no taste to match. A real user would have no way to know the system had nothing to offer them.
+
+---
+
+## 8. Future Work
+
+**Fuzzy genre and mood matching** — right now "pop" and "indie pop" are treated as completely unrelated. A simple similarity list (or even a parent/child tag system) would let the system surface related genres instead of silently ignoring them.
+
+**Catalog confidence signal** — the system should be able to say when it doesn't have enough matching songs. If fewer than two songs earn more than half the max score, the output could include a note like "limited matches for this taste profile" rather than padding the list with low-quality results.
+
+**More songs, especially in the gaps** — the mid-energy range (0.45–0.70) has one song. Adding five or six tracks there would immediately improve recommendations for the largest group of users who don't want music that is either extremely calm or extremely intense.
+
+---
+
+## 9. Personal Reflection
+
+The biggest learning moment in this project was realizing how much a small catalog can undermine an otherwise reasonable scoring system. The math was correct, the logic made sense, but the recommendations were sometimes misleading just because there weren't enough songs to match certain tastes. That gap between "technically working" and "actually useful" is something that doesn't show up until you run real profiles through it.
+
+AI tools helped speed up the analysis — especially when checking expected scores across all fifteen songs for a new profile. But we still had to verify the math by hand before trusting the output, and a few early assumptions about tie-breaking and tier boundaries turned out to be wrong until we traced through specific examples.
+
+What surprised me most was how much the results could "feel" like real recommendations even when they weren't. The formatting, the reason strings, the ranked list — it all looks legitimate. But a user who likes country music would get five lofi songs with no explanation, and it would look exactly the same as a result that genuinely matched their taste. That taught me something real about how easy it is for a system to look smart while actually just being confident.
+
+If this project continued, the first thing I would do is expand the catalog. Not to make the algorithm smarter, but because no amount of scoring logic fixes a dataset that doesn't represent the people using it.
