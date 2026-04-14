@@ -46,10 +46,7 @@ class Recommender:
         return "Explanation placeholder"
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """
-    Loads songs from a CSV file.
-    Required by src/main.py
-    """
+    """Read a songs CSV and return a list of dicts with numeric fields cast to int/float."""
     import csv
 
     int_fields = {"id", "tempo_bpm"}
@@ -67,20 +64,7 @@ def load_songs(csv_path: str) -> List[Dict]:
     return songs
 
 def score_song(song: Dict, user_prefs: Dict) -> Tuple[int, List[str]]:
-    """
-    Score a single song against user preferences using the 12-point system.
-
-    Points breakdown (max 12):
-      Mood  (categorical) — +4 for exact match
-      Genre (categorical) — +3 for exact match
-      Energy (numeric)    — +3 / +2 / +1 / +0 by proximity tier
-      Valence (numeric)   — +2 / +1 / +0 by proximity tier
-
-    Returns
-    -------
-    score   : int in [0, 12]
-    reasons : list of human-readable strings explaining each component
-    """
+    """Score one song against user_prefs on a 12-point scale and return (score, reasons)."""
     score = 0
     reasons: List[str] = []
 
@@ -127,13 +111,7 @@ def score_song(song: Dict, user_prefs: Dict) -> Tuple[int, List[str]]:
 
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """
-    Functional implementation of the recommendation logic.
-    Required by src/main.py
-
-    Judges every song in the catalog with score_song, then uses sorted()
-    to rank the full list and slices the top k results.
-    """
+    """Score every song with score_song, sort by score descending, and return the top k results."""
     results = []
     for song in songs:
         score, reasons = score_song(song, user_prefs)
