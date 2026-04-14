@@ -63,47 +63,63 @@ def load_songs(csv_path: str) -> List[Dict]:
             songs.append(row)
     return songs
 
+# --- Scoring weights (edit here to experiment with sensitivity) ---
+# Weight-shift experiment: energy doubled, genre halved
+#   Original  →  mood 4 | genre 3 | energy 3/2/1 | valence 2/1
+#   Current   →  mood 4 | genre 2 | energy 6/4/2 | valence 2/1
+W_MOOD          = 4   # unchanged
+W_GENRE         = 2   # halved from 3 (3 ÷ 2 rounded up)
+W_ENERGY_CLOSE  = 6   # doubled from 3  (Δ ≤ 0.10)
+W_ENERGY_MID    = 4   # doubled from 2  (Δ ≤ 0.20)
+W_ENERGY_FAR    = 2   # doubled from 1  (Δ ≤ 0.35)
+W_VALENCE_CLOSE = 2   # unchanged       (Δ ≤ 0.10)
+W_VALENCE_MID   = 1   # unchanged       (Δ ≤ 0.25)
+
+# Derived max — import this in main.py so the display stays in sync
+MAX_SCORE = W_MOOD + W_GENRE + W_ENERGY_CLOSE + W_VALENCE_CLOSE  # 14
+
+
 def score_song(song: Dict, user_prefs: Dict) -> Tuple[int, List[str]]:
-    """Score one song against user_prefs on a 12-point scale and return (score, reasons)."""
+    """Score one song against user_prefs using the weight constants above; return (score, reasons)."""
     score = 0
     reasons: List[str] = []
 
-    # --- Mood (max 4 pts) ---
+    # --- Mood (max W_MOOD pts) ---
     if song["mood"] == user_prefs["mood"]:
-        score += 4
-        reasons.append(f"mood match '{song['mood']}' (+4)")
+        score += W_MOOD
+        reasons.append(f"mood match '{song['mood']}' (+{W_MOOD})")
     else:
         reasons.append(f"mood '{song['mood']}' != '{user_prefs['mood']}' (+0)")
 
-    # --- Genre (max 3 pts) ---
+    # --- Genre (max W_GENRE pts) ---
     if song["genre"] == user_prefs["genre"]:
-        score += 3
-        reasons.append(f"genre match '{song['genre']}' (+3)")
+        score += W_GENRE
+        reasons.append(f"genre match '{song['genre']}' (+{W_GENRE})")
     else:
         reasons.append(f"genre '{song['genre']}' != '{user_prefs['genre']}' (+0)")
 
-    # --- Energy (max 3 pts) ---
+    # --- Energy (max W_ENERGY_CLOSE pts) ---
     delta_energy = abs(song["energy"] - user_prefs["energy"])
     if delta_energy <= 0.10:
-        score += 3
-        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.10 (+3)")
+        score += W_ENERGY_CLOSE
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.10 (+{W_ENERGY_CLOSE})")
     elif delta_energy <= 0.20:
-        score += 2
-        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.20 (+2)")
+        score += W_ENERGY_MID
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.20 (+{W_ENERGY_MID})")
     elif delta_energy <= 0.35:
-        score += 1
-        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.35 (+1)")
+        score += W_ENERGY_FAR
+        reasons.append(f"energy Δ{delta_energy:.2f} ≤ 0.35 (+{W_ENERGY_FAR})")
     else:
         reasons.append(f"energy Δ{delta_energy:.2f} > 0.35 (+0)")
 
-    # --- Valence (max 2 pts) ---
+    # --- Valence (max W_VALENCE_CLOSE pts) ---
     delta_valence = abs(song["valence"] - user_prefs["valence"])
     if delta_valence <= 0.10:
-        score += 2
-        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.10 (+2)")
+        score += W_VALENCE_CLOSE
+        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.10 (+{W_VALENCE_CLOSE})")
     elif delta_valence <= 0.25:
-        score += 1
-        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.25 (+1)")
+        score += W_VALENCE_MID
+        reasons.append(f"valence Δ{delta_valence:.2f} ≤ 0.25 (+{W_VALENCE_MID})")
     else:
         reasons.append(f"valence Δ{delta_valence:.2f} > 0.25 (+0)")
 

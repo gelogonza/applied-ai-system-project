@@ -2,7 +2,7 @@
 Command line runner for the Music Recommender Simulation.
 """
 
-from recommender import load_songs, recommend_songs
+from recommender import load_songs, recommend_songs, MAX_SCORE
 
 SEPARATOR = "-" * 60
 
@@ -15,7 +15,7 @@ def show_recommendations(label: str, user_prefs: dict, songs: list, k: int = 5) 
     recommendations = recommend_songs(user_prefs, songs, k=k)
 
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
-        print(f"\n  #{rank}  {song['title']:<35} {score:>2.0f} / 12")
+        print(f"\n  #{rank}  {song['title']:<35} {score:>2.0f} / {MAX_SCORE}")
         print(f"       {SEPARATOR}")
         for reason in explanation.split("; "):
             print(f"       {reason}")
