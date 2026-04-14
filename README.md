@@ -298,5 +298,5 @@ A few sentences about what you learned:
 - Where do you think human judgment still matters, even if the model seems "smart"
 
 ### Screenshots
-<img src="images/screen1.png>
-<img src="images/screen2.png
+<img src="images/screen1.png">
+<img src="images/screen2.png">  
