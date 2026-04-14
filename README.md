@@ -82,7 +82,7 @@ The energy and valence tiers are sized around σ = 0.20 from the Gaussian formul
 
 ## Data Flow
 
-```mermaid
+
 flowchart TD
     A["songs.csv\n15 rows · 10 columns"] -->|load_songs| B["Parse CSV\nEach row → Python dict"]
     B --> C["Select one Song dict\ne.g. Library Rain"]
@@ -115,7 +115,7 @@ flowchart TD
     T --> U["Repeat for all\nremaining songs"]
     U --> V["Sort by score\ndescending"]
     V --> W["Return top N\n(song dict, score, explanation)"]
-```
+
 
 ---
 
@@ -298,5 +298,5 @@ A few sentences about what you learned:
 - Where do you think human judgment still matters, even if the model seems "smart"
 
 ### Screenshots
-![lofi profile output](images/screen1.png)
-![happy/pop profile output](images/screen2.png)
+<img src="images/screen1.png>
+<img src="images/screen2.png
