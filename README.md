@@ -1,305 +1,171 @@
-# 🎵 Music Recommender Simulation
+# 🎵 Mood Music
 
-## Project Summary
-
-In this project you will build and explain a small music recommender system.
-
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-Replace this paragraph with your own summary of what your version does.
+A RAG-powered music recommender that takes a free-text description of what you're in the mood for and returns personalized song recommendations — with explanations that reference actual song attributes like energy, tempo, mood, and acousticness.
 
 ---
 
-## How The System Works
+## Original Project (Modules 1–3)
 
-- What features does each `Song` use in your system
-  - `mood` — categorical, the emotional intent of the track (e.g. chill, happy, intense)
-  - `genre` — categorical, broad stylistic grouping (e.g. lofi, rock, jazz)
-  - `energy` — numeric 0–1, how intense or driving the track feels
-  - `valence` — numeric 0–1, emotional positivity/negativity of the track
-
-- What information does your `UserProfile` store
-  - preferred `mood` and `genre` (categorical)
-  - preferred `energy` and `valence` levels (numeric, 0–1)
-
-- How does your `Recommender` compute a score for each song
-  - categorical features (mood, genre): binary match — 1 if it matches the user's preference, 0 if not
-  - numeric features (energy, valence): Gaussian proximity scoring — score is 1.0 at exact match and decays smoothly as the gap grows (σ = 0.20)
-  - final score = weighted sum: mood (0.35) + genre (0.25) + energy (0.25) + valence (0.15)
-  - mood and genre outweigh numerics because the same mood can be expressed across different energy levels
-
-- How do you choose which songs to recommend
-  - score every song in the catalog against the user profile
-  - rank by final score descending
-  - return the top N results
-
-
+This project started as a rule-based music recommender called the **Music Recommender Simulation**. It scored each song in a 15-track catalog against a hard-coded user profile using a weighted point system (mood, genre, energy, and valence), then returned the top-scoring songs with a breakdown of why each was chosen. The original goal was to explore how real-world AI recommenders turn data into predictions — and to surface the biases and limitations that come with that approach.
 
 ---
 
-## Point Weighting Strategy
+## What Mood Music Does
 
-Each song is scored out of **12 points** against the user profile. The weights mirror the README's proportions (mood 35%, genre 25%, energy 25%, valence 15%) expressed as whole-number points.
+In the upgraded version, you describe what you want in plain English — "something chill to study to" or "high-energy workout music" — and the system:
 
-| Feature | Match condition | Points |
-|---------|----------------|--------|
-| **Mood** (categorical) | exact string match | +4 |
-| **Genre** (categorical) | exact string match | +3 |
-| **Energy** (numeric) | \|song − target\| ≤ 0.10 | +3 |
-| | \|song − target\| ≤ 0.20 | +2 |
-| | \|song − target\| ≤ 0.35 | +1 |
-| | \|song − target\| > 0.35 | +0 |
-| **Valence** (numeric) | \|song − target\| ≤ 0.10 | +2 |
-| | \|song − target\| ≤ 0.25 | +1 |
-| | \|song − target\| > 0.25 | +0 |
+1. **Retrieves** the most relevant songs from the catalog using deterministic keyword scoring (no LLM involved here)
+2. **Passes** those songs as context to Claude along with your original request
+3. **Generates** a recommendation that actively reasons over the retrieved song data — citing specific attributes like energy level, BPM, acousticness, and mood — rather than producing a generic answer
 
-The energy and valence tiers are sized around σ = 0.20 from the Gaussian formula — within one σ earns full numeric points, within two σ earns partial, beyond that earns nothing.
-
-### Expected Biases
-
-- **Categorical lock-in** — mood and genre together control 7 of 12 points. A song that is a near-perfect numeric fit but the wrong genre/mood can never outscore a genre+mood match, even a bad one. The system will always cluster around the user's stated labels.
-- **Lofi/chill dominance** — the catalog has three lofi songs and two of them are tagged `chill`. Any profile that matches this pair will saturate the top two slots every time, leaving little room for variety.
-- **Genre string fragility** — matching is exact. `"indie pop"` does not match `"pop"`, so closely related genres are treated as completely different. A user who likes pop may never see indie pop results.
-- **Numeric proximity to "average" scores well** — songs with mid-range energy and valence (≈ 0.5) earn partial numeric points against almost any profile, which can lift stylistically irrelevant tracks above more fitting ones that happen to have extreme values.
-- **Single fixed profile** — the system assumes one static taste at query time. A user whose mood shifts (study session vs. workout) gets the same recommendations regardless.
-
-### Predicted Top 5 (profile: lofi / chill / energy 0.38 / valence 0.58)
-
-| Rank | Song | Score | Why |
-|------|------|-------|-----|
-| 1 | Library Rain | 12/12 | genre + mood match, Δenergy 0.03, Δvalence 0.02 |
-| 2 | Midnight Coding | 12/12 | genre + mood match, Δenergy 0.04, Δvalence 0.02 |
-| 3 | Spacewalk Thoughts | 9/12 | mood match only, Δenergy 0.10, Δvalence 0.07 |
-| 4 | Focus Flow | 8/12 | genre match only, Δenergy 0.02, Δvalence 0.01 |
-| 5 | Coffee Shop Stories | 4/12 | no categorical match, Δenergy 0.01 (very close), Δvalence 0.13 |
+Logging, guardrails, and tests ensure the system is reproducible and the AI stays grounded in the actual catalog.
 
 ---
 
-## Data Flow
+## Architecture Overview
 
+```
+User query → Input Guardrail → Retrieval Engine (songs.csv)
+                                       ↓
+                              Context Builder (formats songs)
+                                       ↓
+                              Claude Sonnet 4.6 (LLM)
+                              [query + retrieved songs as context]
+                                       ↓
+                              Output Guardrail (must cite a real song)
+                                       ↓
+                              Logger (rag_log.jsonl) → User
+```
 
-flowchart TD
-    A["songs.csv\n15 rows · 10 columns"] -->|load_songs| B["Parse CSV\nEach row → Python dict"]
-    B --> C["Select one Song dict\ne.g. Library Rain"]
+The retrieval layer scores songs against the query using mood/genre keyword maps and energy direction heuristics — fully deterministic and testable without any API calls. Claude only sees the top-k retrieved songs and must reason over their actual attributes.
 
-    subgraph SCORE ["score_song(song, user_prefs)  ·  max 12 pts"]
-        C --> D["Extract 4 features\ngenre · mood · energy · valence"]
-
-        D --> E{"genre ==\nuser genre?"}
-        E -->|yes| F["+3 pts"]
-        E -->|no|  G["+0 pts"]
-
-        F & G --> H{"mood ==\nuser mood?"}
-        H -->|yes| I["+4 pts"]
-        H -->|no|  J["+0 pts"]
-
-        I & J --> K["Δenergy = |song.energy − target|"]
-        K -->|"Δ ≤ 0.10"|         L["+3 pts"]
-        K -->|"0.10 < Δ ≤ 0.20"| M["+2 pts"]
-        K -->|"0.20 < Δ ≤ 0.35"| N["+1 pt"]
-        K -->|"Δ > 0.35"|         O["+0 pts"]
-
-        L & M & N & O --> P["Δvalence = |song.valence − target|"]
-        P -->|"Δ ≤ 0.10"|         Q["+2 pts"]
-        P -->|"0.10 < Δ ≤ 0.25"| R["+1 pt"]
-        P -->|"Δ > 0.25"|         S["+0 pts"]
-
-        Q & R & S --> T["Sum all points\n(0 – 12)"]
-    end
-
-    T --> U["Repeat for all\nremaining songs"]
-    U --> V["Sort by score\ndescending"]
-    V --> W["Return top N\n(song dict, score, explanation)"]
-
+See [`system_diagram.md`](system_diagram.md) for the full Mermaid diagram including testing and human review touchpoints.
 
 ---
 
-## Getting Started
+## Setup
 
-### Setup
-
-1. Create a virtual environment (optional but recommended):
+1. **Clone and enter the project**
 
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
+   git clone <your-repo-url>
+   cd ai110-module3show-musicrecommendersimulation-starter
+   ```
 
-2. Install dependencies
+2. **Install dependencies**
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. Run the app:
+3. **Add your API key**
 
-```bash
-python -m src.main
-```
+   ```bash
+   cp .env.example .env
+   # Open .env and set: ANTHROPIC_API_KEY=your_key_here
+   ```
 
-### Running Tests
+4. **Run the recommender**
 
-Run the starter tests with:
+   ```bash
+   python src/main_rag.py
+   ```
 
-```bash
-pytest
-```
+5. **Run tests** (no API key required)
 
-You can add more tests in `tests/test_recommender.py`.
-
----
-
-## Experiments You Tried
-
-Use this section to document the experiments you ran. For example:
-
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+   ```bash
+   pytest
+   ```
 
 ---
 
-## Limitations and Risks
+## Sample Interactions
 
-Summarize some limitations of your recommender.
+**Query: "something mellow and chill"**
+> Retrieved: Spacewalk Thoughts, Library Rain, Midnight Coding, Moonlit Sonata, Wandering Roads
+>
+> Here are a few mellow and chill picks from the list:
+>
+> **"Spacewalk Thoughts" by Orbit Bloom** — This ambient track is about as mellow as it gets, with a very low energy of 0.28 and a slow 60 BPM tempo. Its high acousticness (0.92) and chill mood make it perfect for unwinding, while a valence of 0.65 keeps it pleasantly warm rather than gloomy.
+>
+> **"Library Rain" by Paper Lanterns** — A classic lofi chill vibe with gentle energy (0.35), an easy 72 BPM tempo, and high acousticness (0.86). It strikes a nice balance — relaxed but with enough subtle groove (danceability 0.58) to keep things cozy rather than sleepy.
+>
+> **"Moonlit Sonata" by Aria Voss** — If you want to go even more serene, this peaceful classical piece has the lowest energy (0.15) and slowest tempo (52 BPM) of the bunch, with near-pure acousticness (0.98). Ideal for a deeply calm, mellow atmosphere.
 
-Examples:
+---
 
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
+**Query: "intense workout gym music"**
+> Retrieved: Iron Abyss, Gym Hero, Street Anthem, Storm Runner, Night Drive Loop
+>
+> **"Iron Abyss" by Dreadmoor** — This metal track is built for intensity — maximum energy (0.96), a punishing 178 BPM tempo, and an angry mood that makes it ideal for pushing through a tough set. Its very low acousticness (0.02) means it's pure electric aggression with nothing soft to slow you down.
+>
+> **"Gym Hero" by Max Pulse** — Pop-fueled workout energy at 0.93, 132 BPM, with high danceability (0.88) and a bright valence (0.77) that keeps the vibe motivating rather than dark. Great if you want energy without the heaviness of metal.
 
-You will go deeper on this in your model card.
+---
+
+**Query: "lofi beats to focus and study"**
+> Retrieved: Midnight Coding, Library Rain, Focus Flow, Spacewalk Thoughts, Coffee Shop Stories
+>
+> **"Midnight Coding" by LoRoom** — Purpose-built for focus sessions: low energy (0.42), a steady 78 BPM, and high acousticness (0.71). The chill mood keeps distractions down while the lofi genre tag signals exactly the kind of background texture that supports concentration.
+>
+> **"Focus Flow" by LoRoom** — Tagged explicitly as "focused" mood with nearly identical specs: energy 0.40, 80 BPM, acousticness 0.78. If Midnight Coding feels slightly too laid-back, Focus Flow's slightly higher acousticness makes it even more ambient and study-friendly.
+
+---
+
+## Design Decisions
+
+**Why RAG instead of just prompting Claude?**
+Prompting Claude with "recommend me study music" would produce made-up song titles. RAG grounds the response in the actual catalog — Claude can only recommend songs it was given, and the output guardrail enforces this.
+
+**Why keyword-based retrieval instead of embeddings?**
+With 15 songs, vector embeddings would be over-engineering. The keyword approach is transparent, testable, and fully deterministic — the same query always returns the same candidates regardless of model or environment.
+
+**Why split retrieval and generation?**
+It separates concerns cleanly: retrieval is pure Python logic you can test without an API key; generation is the one place Claude is involved. This also makes debugging straightforward — if a recommendation is wrong, you can immediately see whether it was a retrieval failure or an LLM failure.
+
+**Trade-offs**
+- The keyword retrieval will miss queries that use synonyms not in the map (e.g. "tranquil" won't match "peaceful" unless added)
+- The 15-song catalog limits variety — the system will frequently recommend the same top songs for similar queries
+- Claude is prompted to stay within the retrieved list, which means a better-fitting song that scored 6th in retrieval won't appear even if it would have been the ideal pick
+
+---
+
+## Testing Summary
+
+**24 tests, all passing.** Tests are split across:
+
+- `tests/test_recommender.py` — original scoring logic (2 tests)
+- `tests/test_rag.py` — RAG pipeline (22 tests), covering:
+  - Input guardrail: empty, whitespace, too-short, too-long, boundary values
+  - Retrieval correctness: chill queries surface lofi, workout queries surface high-energy songs
+  - Retrieval consistency: the same query returns identical results across multiple runs (determinism check)
+  - Output guardrail: catches empty responses and responses that don't cite a real song
+  - Context builder: all song attributes appear in the formatted prompt
+
+No tests call the Claude API — the LLM layer is intentionally excluded from automated testing since its outputs are non-deterministic and subject to rate limits. The consistency tests verify the deterministic retrieval layer instead.
+
+**What I learned:** separating the retrieval logic from the LLM call made testing much easier. I could write 22 meaningful tests without needing an API key or mocking.
 
 ---
 
 ## Reflection
 
-Read and complete `model_card.md`:
+Building Mood Music changed how I think about what "AI" actually means in a product. The most interesting part wasn't Claude — it was realizing that the retrieval layer (pure Python, no model) is what makes Claude's responses accurate and trustworthy. Without it, the LLM would hallucinate songs. With it, every recommendation is grounded in real data.
 
-[**Model Card**](model_card.md)
+The guardrails taught me something too. The output guardrail — which just checks whether Claude mentioned a real song title — is simple enough to fit in three lines, but it catches a real failure mode. Thinking about *what could go wrong* and building a check for it felt more like engineering than just calling an API.
 
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
-
+If I were to extend this, I'd want to add a feedback loop: let the user say "not quite, more upbeat" and have the system adjust the retrieval weights and re-query. That would make the RAG loop genuinely conversational rather than just one-shot.
 
 ---
 
-## 7. `model_card_template.md`
+## Model Card
 
-Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}  
-
-```markdown
-# 🎧 Model Card - Music Recommender Simulation
-
-## 1. Model Name
-
-Give your recommender a name, for example:
-
-> VibeFinder 1.0
+[**View Model Card →**](model_card.md)
 
 ---
 
-## 2. Intended Use
+## Screenshots
 
-- What is this system trying to do
-- Who is it for
-
-Example:
-
-> This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, and energy level. It is for classroom exploration only, not for real users.
-
----
-
-## 3. How It Works (Short Explanation)
-
-Describe your scoring logic in plain language.
-
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
-
-Try to avoid code in this section, treat it like an explanation to a non programmer.
-
----
-
-## 4. Data
-
-Describe your dataset.
-
-- How many songs are in `data/songs.csv`
-- Did you add or remove any songs
-- What kinds of genres or moods are represented
-- Whose taste does this data mostly reflect
-
----
-
-## 5. Strengths
-
-Where does your recommender work well
-
-You can think about:
-- Situations where the top results "felt right"
-- Particular user profiles it served well
-- Simplicity or transparency benefits
-
----
-
-## 6. Limitations and Bias
-
-Where does your recommender struggle
-
-Some prompts:
-- Does it ignore some genres or moods
-- Does it treat all users as if they have the same taste shape
-- Is it biased toward high energy or one genre by default
-- How could this be unfair if used in a real product
-
----
-
-## 7. Evaluation
-
-How did you check your system
-
-Examples:
-- You tried multiple user profiles and wrote down whether the results matched your expectations
-- You compared your simulation to what a real app like Spotify or YouTube tends to recommend
-- You wrote tests for your scoring logic
-
-You do not need a numeric metric, but if you used one, explain what it measures.
-
----
-
-## 8. Future Work
-
-If you had more time, how would you improve this recommender
-
-Examples:
-
-- Add support for multiple users and "group vibe" recommendations
-- Balance diversity of songs instead of always picking the closest match
-- Use more features, like tempo ranges or lyric themes
-
----
-
-## 9. Personal Reflection
-
-A few sentences about what you learned:
-
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
-
-```
-
-### Screenshots
 <img src="assets/screen1.png">
 <img src="assets/screen2.png">
 <img src="assets/screen3.png">
