@@ -9,6 +9,7 @@ the same songs in the same order for the same query (no randomness).
 from src.rag import (
     build_context,
     retrieve_songs,
+    score_response,
     validate_input,
     validate_output,
 )
@@ -165,6 +166,46 @@ class TestValidateOutput:
     def test_response_mentioning_second_song(self):
         ok, _ = validate_output("Iron Abyss will power your workout session.", CATALOG)
         assert ok
+
+
+# ---------------------------------------------------------------------------
+# Confidence scorer tests
+# ---------------------------------------------------------------------------
+
+class TestScoreResponse:
+    def test_empty_response_scores_zero(self):
+        assert score_response("", CATALOG) == 0.0
+
+    def test_whitespace_scores_zero(self):
+        assert score_response("   ", CATALOG) == 0.0
+
+    def test_generic_response_scores_low(self):
+        # No song titles, no attribute keywords
+        score = score_response("I recommend some great music for you!", CATALOG)
+        assert score < 0.3
+
+    def test_response_with_song_and_attributes_scores_high(self):
+        # Cites 1 of 5 songs + 7 of 8 attributes → song_rate=0.10, attr=0.44 → ~0.54
+        response = (
+            "Midnight Coding by LoRoom has a chill mood with energy 0.42 "
+            "and high acousticness. Its slow tempo of 78 BPM and lofi genre "
+            "make it perfect for studying. The valence is 0.56."
+        )
+        score = score_response(response, CATALOG)
+        assert score >= 0.5
+
+    def test_score_is_between_zero_and_one(self):
+        response = "Library Rain — energy 0.35, 72 BPM, acousticness 0.86, mood chill."
+        score = score_response(response, CATALOG)
+        assert 0.0 <= score <= 1.0
+
+    def test_more_songs_cited_raises_score(self):
+        one_song = "Try Midnight Coding — it has low energy and good acousticness."
+        two_songs = (
+            "Try Midnight Coding — it has low energy and good acousticness. "
+            "Library Rain is also great for its slow tempo and chill mood."
+        )
+        assert score_response(two_songs, CATALOG) > score_response(one_song, CATALOG)
 
 
 # ---------------------------------------------------------------------------
