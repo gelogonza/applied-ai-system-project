@@ -1,6 +1,19 @@
 # 🎵 Mood Music
 
-A RAG-powered music recommender that takes a free-text description of what you're in the mood for and returns personalized song recommendations — with explanations that reference actual song attributes like energy, tempo, mood, and acousticness.
+A RAG-powered music recommender that takes a free-text description of what you're in the mood for and returns personalized song recommendations — with explanations that actively reference song attributes like energy, tempo, mood, and acousticness.
+
+**Model:** Claude Sonnet 4.6 &nbsp;|&nbsp; **Retrieval:** keyword scoring against `songs.csv` &nbsp;|&nbsp; **Interface:** Streamlit web app + terminal CLI
+
+---
+
+## AI Features
+
+| Feature | Status | How it's implemented |
+|---|---|---|
+| **Retrieval-Augmented Generation (RAG)** | ✅ | Deterministic keyword retrieval from `songs.csv` feeds Claude a structured context block; Claude must cite retrieved song attributes in every response |
+| **Reliability & Testing System** | ✅ | 30 automated tests, output guardrail, confidence scorer (0–1), and a reliability check script that runs 6 real queries and reports pass/fail with scores |
+| Agentic Workflow | — | Not implemented |
+| Fine-Tuned Model | — | Not implemented |
 
 ---
 
@@ -45,43 +58,51 @@ See [`system_diagram.md`](system_diagram.md) for the full Mermaid diagram includ
 
 ## Setup
 
-1. **Clone and enter the project**
+**1. Clone and enter the project**
 
-   ```bash
-   git clone <your-repo-url>
-   cd ai110-module3show-musicrecommendersimulation-starter
-   ```
+```bash
+git clone <your-repo-url>
+cd ai110-module3show-musicrecommendersimulation-starter
+```
 
-2. **Install dependencies**
+**2. Install dependencies**
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-3. **Add your API key**
+**3. Add your API key**
 
-   ```bash
-   cp .env.example .env
-   # Open .env and set: ANTHROPIC_API_KEY=your_key_here
-   ```
+```bash
+cp .env.example .env
+# Open .env and fill in: ANTHROPIC_API_KEY=your_key_here
+```
 
-4. **Run the web app** (recommended)
+---
 
-   ```bash
-   streamlit run src/app.py
-   ```
+## How to Run
 
-   Or use the terminal CLI instead:
+There are four ways to run the project depending on what you want to do:
 
-   ```bash
-   python src/main_rag.py
-   ```
+**Web app** — full UI with retrieved songs, confidence score, and query history *(recommended)*
+```bash
+streamlit run src/app.py
+```
 
-5. **Run tests** (no API key required)
+**Terminal CLI** — same RAG pipeline, plain text output
+```bash
+python src/main_rag.py
+```
 
-   ```bash
-   pytest
-   ```
+**Automated tests** — 30 tests, no API key required
+```bash
+pytest
+```
+
+**AI reliability check** — runs 6 real queries against Claude, reports pass/fail and confidence scores, saves `reliability_report.json`
+```bash
+python scripts/reliability_check.py
+```
 
 ---
 
