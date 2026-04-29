@@ -8,6 +8,9 @@ __pycache__/
 env/
 venv/
 
+# environment vars
+.env
+
 # OS files
 .DS_Store
 
@@ -15,3 +18,7 @@ venv/
 .pytest_cache/
 
 notes.txt
+
+# Runtime outputs — contain API responses, not source code
+rag_log.jsonl
+reliability_report.json
