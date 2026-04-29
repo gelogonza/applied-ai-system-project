@@ -27,6 +27,12 @@ log = logging.getLogger(__name__)
 
 LOG_FILE = Path("rag_log.jsonl")
 
+# Attributes we expect Claude to reference when actively using the retrieved data
+ATTRIBUTE_KEYWORDS = {
+    "energy", "bpm", "tempo", "mood", "genre",
+    "acousticness", "valence", "danceability",
+}
+
 # ---------------------------------------------------------------------------
 # Keyword maps for retrieval
 # Maps each catalog mood/genre value to natural-language synonyms.
@@ -175,7 +181,38 @@ def build_messages(query: str, retrieved_songs: List[Dict]) -> List[Dict]:
 
 
 # ---------------------------------------------------------------------------
-# 4. Output guardrail
+# 4. Confidence scorer
+# ---------------------------------------------------------------------------
+def score_response(response: str, retrieved_songs: List[Dict]) -> float:
+    """
+    Return a confidence score 0.0–1.0 measuring how actively Claude used
+    the retrieved song data.
+
+    Combines two signals (equal weight):
+    - song_citation_rate: fraction of retrieved songs mentioned by name
+    - attribute_density:  fraction of key song attributes referenced
+      (energy, bpm, tempo, mood, genre, acousticness, valence, danceability)
+
+    A score near 1.0 means Claude cited multiple songs AND used their
+    specific numeric/categorical attributes. A low score suggests the
+    response was vague or ignored the retrieved context.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    response_lower = response.lower()
+
+    cited = sum(1 for s in retrieved_songs if s["title"].lower() in response_lower)
+    song_rate = cited / max(len(retrieved_songs), 1)
+
+    attrs_present = sum(1 for a in ATTRIBUTE_KEYWORDS if a in response_lower)
+    attr_density = attrs_present / len(ATTRIBUTE_KEYWORDS)
+
+    return round(song_rate * 0.5 + attr_density * 0.5, 2)
+
+
+# ---------------------------------------------------------------------------
+# 5. Output guardrail
 # ---------------------------------------------------------------------------
 def validate_output(response: str, retrieved_songs: List[Dict]) -> Tuple[bool, str]:
     """Return (is_valid, error_message). Checks that the response is non-empty
@@ -190,13 +227,14 @@ def validate_output(response: str, retrieved_songs: List[Dict]) -> Tuple[bool, s
 
 
 # ---------------------------------------------------------------------------
-# 5. Logger
+# 6. Logger
 # ---------------------------------------------------------------------------
 def log_to_file(
     query: str,
     retrieved_songs: List[Dict],
     response: str,
     guardrail_passed: bool,
+    confidence: float = 0.0,
     error: str = "",
 ) -> None:
     """Append one JSON line to rag_log.jsonl for audit and debugging."""
@@ -206,6 +244,7 @@ def log_to_file(
         "retrieved_titles": [s["title"] for s in retrieved_songs],
         "response": response,
         "guardrail_passed": guardrail_passed,
+        "confidence_score": confidence,
         "error": error,
     }
     with LOG_FILE.open("a") as f:
@@ -214,7 +253,7 @@ def log_to_file(
 
 
 # ---------------------------------------------------------------------------
-# 6. Main RAG pipeline
+# 7. Main RAG pipeline
 # ---------------------------------------------------------------------------
 FALLBACK_RESPONSE = (
     "Sorry, I couldn't generate a valid recommendation. "
@@ -269,9 +308,11 @@ def run_rag(
         getattr(message.usage, "cache_creation_input_tokens", "n/a"),
     )
 
-    # 5. Output guardrail
+    # 5. Score + output guardrail
+    confidence = score_response(response, retrieved)
     valid_out, err_out = validate_output(response, retrieved)
-    log_to_file(query, retrieved, response, valid_out, error=err_out)
+    log_to_file(query, retrieved, response, valid_out, confidence=confidence, error=err_out)
+    log.info("Confidence score: %.2f", confidence)
 
     if not valid_out:
         log.warning("Output guardrail failed: %s", err_out)
