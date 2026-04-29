@@ -308,3 +308,4 @@ A few sentences about what you learned:
 <img src="assets/screen6.png">
 <img src="assets/screen7.png">
 <img src="assets/screen8.png">
+<img src="assets/system-diagram.png">
