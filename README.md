@@ -207,6 +207,12 @@ If I were to extend this, I'd want to add a feedback loop: let the user say "not
 
 ---
 
+## Demo
+
+[▶ Watch the project walkthrough on Loom](https://www.loom.com/share/867a1cea0d5647d38bb3d1bcf8830fd9)
+
+---
+
 ## Model Card
 
 [**View Model Card →**](model_card.md)
