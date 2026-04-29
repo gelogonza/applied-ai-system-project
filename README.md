@@ -132,19 +132,41 @@ It separates concerns cleanly: retrieval is pure Python logic you can test witho
 
 ## Testing Summary
 
-**24 tests, all passing.** Tests are split across:
+### Automated tests — 30/30 passing
 
-- `tests/test_recommender.py` — original scoring logic (2 tests)
-- `tests/test_rag.py` — RAG pipeline (22 tests), covering:
-  - Input guardrail: empty, whitespace, too-short, too-long, boundary values
-  - Retrieval correctness: chill queries surface lofi, workout queries surface high-energy songs
-  - Retrieval consistency: the same query returns identical results across multiple runs (determinism check)
-  - Output guardrail: catches empty responses and responses that don't cite a real song
-  - Context builder: all song attributes appear in the formatted prompt
+| Suite | Tests | What it covers |
+|---|---|---|
+| `tests/test_recommender.py` | 2 | Original scoring logic |
+| `tests/test_rag.py` | 28 | Full RAG pipeline (no API calls needed) |
 
-No tests call the Claude API — the LLM layer is intentionally excluded from automated testing since its outputs are non-deterministic and subject to rate limits. The consistency tests verify the deterministic retrieval layer instead.
+The RAG tests cover four areas:
+- **Input guardrail** — empty, whitespace, too-short, too-long, and boundary queries
+- **Retrieval correctness** — chill queries surface lofi songs; workout queries surface high-energy songs; genre keywords match catalog genres
+- **Retrieval consistency** — the same query run 5 times always returns identical results (determinism check)
+- **Output guardrail + confidence scorer** — empty responses score 0.0; generic responses score below 0.3; responses that cite songs and reference attributes score above 0.5; more citations always raise the score
 
-**What I learned:** separating the retrieval logic from the LLM call made testing much easier. I could write 22 meaningful tests without needing an API key or mocking.
+### AI reliability check — run against Claude
+
+`python scripts/reliability_check.py` runs 6 predefined queries against Claude and measures each response on two dimensions: whether the output guardrail passes (response cites at least one real song) and a **confidence score** (0–1) that measures how actively Claude used the retrieved data — counting how many song titles and attributes like energy, tempo, and acousticness appear in the answer.
+
+**Sample results from a development run:**
+
+| # | Query | Guardrail | Confidence |
+|---|---|---|---|
+| 1 | something chill to study to | ✓ PASS | 0.54 |
+| 2 | intense workout gym music | ✓ PASS | 0.56 |
+| 3 | romantic dinner jazz | ✓ PASS | 0.50 |
+| 4 | angry aggressive heavy music | ✓ PASS | 0.56 |
+| 5 | upbeat pop songs to dance to | ✓ PASS | 0.50 |
+| 6 | music *(vague input)* | ✗ FAIL | 0.19 |
+
+**5 / 6 passed. Average confidence: 0.47. The AI struggled when the input provided no context** — the near-empty query "music" produced a retrieval with no strong keyword signals, and Claude's response was too generic to cite specific attributes. Adding the output guardrail and confidence threshold caught this failure automatically.
+
+To reproduce: `python scripts/reliability_check.py` (requires `ANTHROPIC_API_KEY`). Results are saved to `reliability_report.json`.
+
+### What I learned
+
+Separating retrieval from generation made the system much easier to test — 28 of the 30 tests run with no API key at all. The confidence scorer revealed something the output guardrail alone couldn't: Claude was always technically "passing" (citing a song name) but the quality varied a lot depending on how specific the retrieval results were. That showed the retrieval layer is the real bottleneck, not the LLM.
 
 ---
 
