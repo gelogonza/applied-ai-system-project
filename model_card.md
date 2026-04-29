@@ -1,10 +1,10 @@
-# Model Card: Music Recommender Simulation
+# Model Card: Mood Music
 
 ## 1. Model Name
 
-**MusicVibes 1.0**
+**Mood Music** (upgraded from MusicVibes 1.0)
 
-A lightweight song recommender that matches your vibe to a small catalog using mood, genre, and energy.
+A RAG-powered music recommender that takes a free-text description of what you're in the mood for and uses Claude to generate personalized recommendations grounded in actual song attributes — energy, tempo, acousticness, valence, and more.
 
 ---
 
@@ -109,7 +109,32 @@ The most surprising result was how confident the output looked even when it was 
 
 ---
 
-## 9. Personal Reflection
+## 9. RAG Upgrade — How the AI Layer Works
+
+The original MusicVibes 1.0 system described in sections 1–8 was rule-based: no language model, no natural language input, just a point system applied to a fixed list of profiles. The upgraded version, Mood Music, adds a Retrieval-Augmented Generation (RAG) layer on top of that foundation.
+
+**What changed:**
+
+Instead of asking for a structured profile (genre, mood, energy level), the user now types a free-text description — "something mellow to study to" or "aggressive gym music." The system handles the rest in two stages:
+
+1. **Retrieval (no LLM):** The query is tokenized and matched against keyword maps for each song's mood and genre. Songs are scored by how many query terms align with their attributes, and the top five candidates are selected. This stage is fully deterministic — the same query always returns the same candidates, with no API call required.
+
+2. **Generation (Claude Sonnet 4.6):** The retrieved songs are formatted as a structured context block and sent to Claude alongside the original query. The system prompt instructs Claude to recommend only from the retrieved list and to cite specific attributes — energy level, BPM, acousticness, valence — in its explanation. Claude does not invent songs or draw on outside knowledge.
+
+**Guardrails and reliability:**
+
+- An input guardrail rejects empty, too-short, or too-long queries before anything reaches the LLM.
+- An output guardrail verifies that Claude's response names at least one real song from the retrieved list — catching cases where the model produces a generic or hallucinated answer.
+- A confidence scorer (0–1) measures how actively Claude used the retrieved data, combining the fraction of retrieved songs cited by name with the fraction of key audio attributes referenced.
+- Every interaction is logged to `rag_log.jsonl` with the query, retrieved songs, response, guardrail result, and confidence score.
+
+**What the AI adds vs the original system:**
+
+The original system could only answer structured queries and its explanations were mechanical score breakdowns. The RAG system accepts natural language, returns conversational explanations that read like a real recommendation, and can handle nuanced requests ("something not too intense but still upbeat") that the point system had no way to process. The trade-off is that the LLM introduces non-determinism into the explanation layer — though the retrieval layer remains fully deterministic and testable.
+
+---
+
+## 10. Personal Reflection
 
 The biggest learning moment in this project was realizing how much a small catalog can undermine an otherwise reasonable scoring system. The math was correct, the logic made sense, but the recommendations were sometimes misleading just because there weren't enough songs to match certain tastes. That gap between "technically working" and "actually useful" is something that doesn't show up until you run real profiles through it.
 

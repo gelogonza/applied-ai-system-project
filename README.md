@@ -65,7 +65,13 @@ See [`system_diagram.md`](system_diagram.md) for the full Mermaid diagram includ
    # Open .env and set: ANTHROPIC_API_KEY=your_key_here
    ```
 
-4. **Run the recommender**
+4. **Run the web app** (recommended)
+
+   ```bash
+   streamlit run src/app.py
+   ```
+
+   Or use the terminal CLI instead:
 
    ```bash
    python src/main_rag.py
@@ -149,18 +155,18 @@ The RAG tests cover four areas:
 
 `python scripts/reliability_check.py` runs 6 predefined queries against Claude and measures each response on two dimensions: whether the output guardrail passes (response cites at least one real song) and a **confidence score** (0–1) that measures how actively Claude used the retrieved data — counting how many song titles and attributes like energy, tempo, and acousticness appear in the answer.
 
-**Sample results from a development run:**
+**Results from a real run against Claude Sonnet 4.6:**
 
 | # | Query | Guardrail | Confidence |
 |---|---|---|---|
-| 1 | something chill to study to | ✓ PASS | 0.54 |
-| 2 | intense workout gym music | ✓ PASS | 0.56 |
-| 3 | romantic dinner jazz | ✓ PASS | 0.50 |
-| 4 | angry aggressive heavy music | ✓ PASS | 0.56 |
-| 5 | upbeat pop songs to dance to | ✓ PASS | 0.50 |
-| 6 | music *(vague input)* | ✗ FAIL | 0.19 |
+| 1 | something chill to study to | ✓ PASS | 0.61 |
+| 2 | intense workout gym music | ✓ PASS | 0.84 |
+| 3 | romantic dinner jazz | ✓ PASS | 0.74 |
+| 4 | angry aggressive heavy music | ✓ PASS | 0.68 |
+| 5 | upbeat pop songs to dance to | ✓ PASS | 0.74 |
+| 6 | music *(vague input)* | ✓ PASS | 0.68 |
 
-**5 / 6 passed. Average confidence: 0.47. The AI struggled when the input provided no context** — the near-empty query "music" produced a retrieval with no strong keyword signals, and Claude's response was too generic to cite specific attributes. Adding the output guardrail and confidence threshold caught this failure automatically.
+**6 / 6 passed. Average confidence: 0.71.** Even the deliberately vague query "music" passed — Claude still cited real song titles from the retrieved list — though it scored lower than specific queries because the retrieval had no keyword signals to work with, returning a mixed bag of songs. The highest confidence (0.84) came from the workout query, where strong energy keywords produced a tightly focused retrieval and Claude referenced multiple attributes per song.
 
 To reproduce: `python scripts/reliability_check.py` (requires `ANTHROPIC_API_KEY`). Results are saved to `reliability_report.json`.
 
